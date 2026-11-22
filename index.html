@@ -185,6 +185,8 @@ function setMark(d,wid,o){
 function isClosed(k){return S.closed.indexOf(k)>=0}
 function maasOn(w,d){var h=w.maas.slice().sort(function(a,b){return a.t<b.t?-1:1}),r=h[0].m;h.forEach(function(x){if(x.t<=d)r=x.m});return r}
 function yev(w,d){return maasOn(w,d)/30}
+/* izin hakkı işe girişten itibaren her dolan 7 günde 1 doğar, ay sınırı tanımaz */
+function hafta(w,d){var e=(w.cikis&&w.cikis<d)?w.cikis:d;if(e<w.giris)return 0;return Math.floor((Math.round((pd(e)-pd(w.giris))/864e5)+1)/7)}
 function curMaas(w){return maasOn(w,TODAY)}
 function izNow(w){var k=ym(TODAY);if(w.cikis&&w.cikis<k+'-01')k=ym(w.cikis);var r=calc(w,k);return r?r.izK:(w.izDev||0)}
 
@@ -201,7 +203,7 @@ function calc(w,k,depth){
  for(i=1;i<=L;i++){var d=k+'-'+p2(i);if(!active(w,d))continue;var s=mark(d,w.id),r=yev(w,d);
   if(s.d==='G'){Gn++;gK+=r}else if(s.d==='Y'){Yn++;yK+=r/2}else if(s.d==='I'){U++}
   if(s.m){M+=s.m;mes+=r*s.m}}
- var H=Math.floor(D/7),endD=(w.cikis&&w.cikis<mE)?w.cikis:mE,rE=yev(w,endD);
+ var H=hafta(w,mE)-hafta(w,addD(mS,-1)),endD=(w.cikis&&w.cikis<mE)?w.cikis:mE,rE=yev(w,endD);
  var izD=w.izDev||0;if(depth<120){var pz=calc(w,addM(k,-1),depth+1);if(pz)izD=pz.izK}
  var izB=izD+H-U,ov=(S.izOde[k]||{})[w.id],ode;
  if(typeof ov==='number')ode=Math.max(Math.min(0,izB),Math.min(Math.max(0,izB),ov));
@@ -482,7 +484,7 @@ function settings(){
  '<textarea id="s_tx" rows="3" placeholder="…veya kopyaladığınız yedeği buraya yapıştırın"></textarea><button class="btn sec" id="s_ld">Yapıştırılanı yükle</button>'+
  '<div class="sec-t">Kullanılmayan izin ay sonunda</div><div class="seg"><button id="m_ode" class="'+(S.izMod==='ode'?'on':'')+'">Maaşa ekle / kes</button><button id="m_bir" class="'+(S.izMod==='bir'?'on':'')+'">Biriktir</button></div>'+
  '<p class="note">Varsayılan budur. Kişi bazında fişten değiştirebilirsiniz. Kapatılmış aylar değişmez.</p>'+
- '<div class="sec-t">Kurallar</div><p class="note">Yevmiye = aylık maaş ÷ 30. Tam ay 30 gün sayılır; ay ortası giren, girdiği günden 30\'a kadar alır. Her 7 güne 1 gün ücretli izin hakkı doğar. Kullanılmayan izin ya maaşa eklenir ya biriktirilir; fazla kullanılan izin ya kesilir ya borç olarak devreder (fişten seçilir). Mesai yevmiye × 1.</p>'+
+ '<div class="sec-t">Kurallar</div><p class="note">Yevmiye = aylık maaş ÷ 30. Tam ay 30 gün sayılır; ay ortası giren, girdiği günden 30\'a kadar alır. İşe girişten itibaren her dolan 7 günde 1 gün ücretli izin hakkı doğar; ay bitince yarım kalan hafta sonraki aya sayılır. Kullanılmayan izin ya maaşa eklenir ya biriktirilir; fazla kullanılan izin ya kesilir ya borç olarak devreder (fişten seçilir). Mesai yevmiye × 1.</p>'+
  '<button class="btn red" id="s_rm" style="margin-top:14px">Tüm verileri sil</button><button class="btn sec" id="s_no">Kapat</button>');
  var json=function(){return JSON.stringify({app:'puantaj',v:1,at:new Date().toISOString(),data:S})};
  $('s_dl').onclick=function(){shareFile(new Blob([json()],{type:'application/json'}),'puantaj-yedek-'+TODAY+'.json')};
