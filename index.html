@@ -186,6 +186,16 @@ function isClosed(k){return S.closed.indexOf(k)>=0}
 function maasOn(w,d){var h=w.maas.slice().sort(function(a,b){return a.t<b.t?-1:1}),r=h[0].m;h.forEach(function(x){if(x.t<=d)r=x.m});return r}
 function yev(w,d){return maasOn(w,d)/30}
 function curMaas(w){return maasOn(w,TODAY)}
+function waUrl(w,t){var n=String(w&&w.tel||'').replace(/\D/g,'');if(n.length===11&&n[0]==='0')n='9'+n;else if(n.length===10&&n[0]==='5')n='90'+n;return 'https://wa.me/'+(n.length>=11?n:'')+'?text='+encodeURIComponent(t)}
+function waBtn(w,t,lbl){return '<a class="btn wa" href="'+waUrl(w,t)+'" target="_blank" rel="noopener">'+(lbl||'💬 WhatsApp\'tan bildir')+'</a>'+(w&&w.tel?'':'<p class="note" style="text-align:center">Telefon kayıtlı değil, WhatsApp\'ta kişiyi siz seçeceksiniz. Çalışan kartına telefon ekleyebilirsiniz.</p>')}
+function advMsg(a){var w=W(a.w),k=ym(a.t),top=S.adv.filter(function(x){return x.w===a.w&&ym(x.t)===k}).reduce(function(t,x){return t+x.tl},0);
+ return 'Sayın '+w.ad+',\n'+tarihAd(a.t)+' tarihinde *'+TL(a.tl)+'* avans aldınız.'+(a.not?' ('+a.not+')':'')+'\n'+ayAd(k)+' toplam avansınız: *'+TL(top)+'*'}
+function izBugun(w){var k=ym(TODAY),r=calc(w,k);if(!r)return{bal:izNow(w)};var day=Math.min(+TODAY.slice(8),r.c),ds=Math.max(0,day-r.g+1),Hs=Math.floor(ds/7),Us=0;
+ for(var i=1;i<=+TODAY.slice(8);i++){var d=k+'-'+p2(i);if(active(w,d)&&mark(d,w.id).d==='I')Us++}
+ return{izD:r.izD,H:Hs,U:Us,bal:r.izD+Hs-Us}}
+function izMsg(w){var z=izBugun(w);var L=['Sayın '+w.ad+',',tarihAd(TODAY)+' itibarıyla izin durumunuz:'];
+ if(z.H!==undefined){if(z.izD)L.push('Önceki aylardan: '+izG(z.izD));L.push(ayAd(ym(TODAY))+' hak edilen: '+z.H+' gün, kullanılan: '+z.U+' gün')}
+ L.push('*Şu an: '+izG(z.bal)+'*');return L.join('\n')}
 function izNow(w){var k=ym(TODAY);if(w.cikis&&w.cikis<k+'-01')k=ym(w.cikis);var r=calc(w,k);return r?r.izK:(w.izDev||0)}
 
 function calc(w,k,depth){
@@ -299,7 +309,7 @@ function vCalisan(){
 function listCalisan(){
  return S.workers.filter(qf).sort(function(a,b){var ax=a.cikis&&a.cikis<TODAY,bx=b.cikis&&b.cikis<TODAY;if(ax!==bx)return ax?1:-1;return a.ad.localeCompare(b.ad,'tr')}).map(function(w){
   var gone=w.cikis&&w.cikis<TODAY;
-  return '<button class="row" data-wk="'+w.id+'"'+(gone?' style="opacity:.55"':'')+'><div class="av">'+esc(ini(w.ad))+'</div><div class="nm"><b>'+esc(w.ad)+'</b><small>'+esc(w.gorev||'—')+' · Giriş '+tarihAd(w.giris)+(function(){var z=gone?0:izNow(w);return z?' · <b style="color:'+(z>0?'var(--ok,#2d8a56)':'#c63f2e')+'">izin '+izG(z)+'</b>':''})()+'</small></div>'+(gone?'<span class="chip c-X">Ayrıldı</span>':'<span class="amt">'+TL(curMaas(w)/30)+'<small style="color:var(--mut);font-weight:600">/gün</small></span>')+'</button>';
+  return '<button class="row" data-wk="'+w.id+'"'+(gone?' style="opacity:.55"':'')+'><div class="av">'+esc(ini(w.ad))+'</div><div class="nm"><b>'+esc(w.ad)+'</b><small>'+esc(w.gorev||'—')+' · Giriş '+tarihAd(w.giris)+(function(){var z=gone?0:izBugun(w).bal;return z?' · <b style="color:'+(z>0?'var(--ok,#2d8a56)':'#c63f2e')+'">izin '+izG(z)+'</b>':''})()+'</small></div>'+(gone?'<span class="chip c-X">Ayrıldı</span>':'<span class="amt">'+TL(curMaas(w)/30)+'<small style="color:var(--mut);font-weight:600">/gün</small></span>')+'</button>';
  }).join('')||'<div class="empty">Bulunamadı.</div>';
 }
 function addWorker(){
@@ -309,6 +319,7 @@ function addWorker(){
  '<label>Görevi (isteğe bağlı)</label><input id="f_gr" placeholder="Usta, kalfa, düz işçi…">'+
  '<label>Aylık maaş (₺)</label><input id="f_ms" type="text" inputmode="numeric" placeholder="Örn. 45000"><div class="hl" id="f_yv">Yevmiye: —</div>'+
  '<label>İşe giriş tarihi</label><input id="f_gi" type="date" value="'+TODAY+'">'+
+ '<label>Telefon (isteğe bağlı, WhatsApp için)</label><input id="f_tel" type="tel" inputmode="tel" placeholder="05xx xxx xx xx">'+
  '<button class="btn" id="f_ok">Kaydet, sıradakini gir</button><button class="btn sec" id="f_no">Bitti, kapat</button>');
  $('f_ms').oninput=function(){var v=num(this.value);$('f_yv').innerHTML=v>0?'Yevmiye: <b>'+TL(v/30)+'</b> (maaş ÷ 30)':'Yevmiye: —'};
  $('f_no').onclick=function(){
@@ -319,9 +330,9 @@ function addWorker(){
  $('f_ok').onclick=function(){
   var ad=$('f_ad').value.trim(),ms=num($('f_ms').value),gi=$('f_gi').value;
   if(!ad)return toast('Ad soyad yazın');if(!(ms>0))return toast('Maaşı yazın');if(!gi)return toast('Giriş tarihini seçin');
-  S.workers.push({id:uid(),ad:ad,gorev:$('f_gr').value.trim(),giris:gi,cikis:null,maas:[{t:gi,m:ms}]});
+  S.workers.push({id:uid(),ad:ad,gorev:$('f_gr').value.trim(),tel:$('f_tel').value.trim(),giris:gi,cikis:null,maas:[{t:gi,m:ms}]});
   touch(['core']);added++;confirmLeave=false;
-  $('f_ad').value='';$('f_gr').value='';
+  $('f_ad').value='';$('f_gr').value='';$('f_tel').value='';
   var cn=$('f_cn');cn.style.display='block';cn.textContent='✓ '+ad+' eklendi · bu seferde '+added+' kişi';
   render();$('f_ad').focus();
  };
@@ -331,18 +342,19 @@ function editWorker(wid){
  var w=W(wid),zh=w.maas.slice().sort(function(a,b){return a.t<b.t?-1:1});
  var h='<h3>'+esc(w.ad)+'</h3><p class="sub">'+esc(w.gorev||'—')+'</p>'+
  '<label>Ad Soyad</label><input id="e_ad" value="'+esc(w.ad)+'"><label>Görevi</label><input id="e_gr" value="'+esc(w.gorev||'')+'">'+
+ '<label>Telefon (WhatsApp için)</label><input id="e_tel" type="tel" inputmode="tel" value="'+esc(w.tel||'')+'" placeholder="05xx xxx xx xx">'+
  '<label>İşe giriş tarihi</label><input id="e_gi" type="date" value="'+w.giris+'">'+
  '<div class="sec-t">Maaş</div>'+zh.map(function(z){return '<div class="kv"><span>'+tarihAd(z.t)+' itibarıyla</span><b>'+TL(z.m)+' <small style="color:var(--mut)">('+TL(z.m/30)+'/gün)</small></b></div>'}).join('')+
  '<div style="display:flex;gap:8px;margin-top:10px"><div style="flex:1"><label>Yeni maaş</label><input id="e_zm" type="text" inputmode="numeric" placeholder="Zamlı maaş"></div><div style="flex:1"><label>Geçerli tarih</label><input id="e_zt" type="date" value="'+TODAY+'"></div></div>'+
  '<p class="note" style="margin-top:-6px">Zam tarihinden önceki günler eski maaştan hesaplanır.</p>'+
  '<div class="sec-t">İzin</div><label>İşe girdiğinde içeride biriken izin (gün)</label><input id="e_iz" type="text" inputmode="numeric" value="'+(w.izDev||'')+'" placeholder="Yoksa boş bırakın">'+
- '<p class="note" style="margin-top:-6px">Uygulamaya geçmeden önceki birikmiş izni. Borçluysa başına eksi yazın (örn. -4). Şu anki bakiye: <b>'+izG(izNow(w))+'</b></p>'+
+ '<p class="note" style="margin-top:-6px">Uygulamaya geçmeden önceki birikmiş izni. Borçluysa başına eksi yazın (örn. -4). Bugünkü bakiye: <b>'+izG(izBugun(w).bal)+'</b></p>'+
  '<div class="sec-t">İşten ayrılış</div><label>Ayrılış tarihi (çalışıyorsa boş bırakın)</label><input id="e_ci" type="date" value="'+(w.cikis||'')+'">'+
- '<button class="btn" id="e_ok">Kaydet</button><button class="btn sec" id="e_fs">Bu ayın fişini gör</button><button class="btn red" id="e_del">Çalışanı sil</button>';
+ '<button class="btn" id="e_ok">Kaydet</button>'+waBtn(w,izMsg(w),'💬 İzin durumunu WhatsApp\'tan gönder')+'<button class="btn sec" id="e_fs">Bu ayın fişini gör</button><button class="btn red" id="e_del">Çalışanı sil</button>';
  openSheet(h);
  $('e_ok').onclick=function(){
   var ad=$('e_ad').value.trim();if(!ad)return toast('Ad boş olamaz');
-  w.ad=ad;w.gorev=$('e_gr').value.trim();var gi=$('e_gi').value;if(gi){w.giris=gi;w.maas.sort(function(a,b){return a.t<b.t?-1:1});w.maas[0].t=gi<w.maas[0].t?gi:w.maas[0].t}
+  w.ad=ad;w.gorev=$('e_gr').value.trim();w.tel=$('e_tel').value.trim();var gi=$('e_gi').value;if(gi){w.giris=gi;w.maas.sort(function(a,b){return a.t<b.t?-1:1});w.maas[0].t=gi<w.maas[0].t?gi:w.maas[0].t}
   var zm=num($('e_zm').value),zt=$('e_zt').value;if(zm>0&&zt){w.maas=w.maas.filter(function(z){return z.t!==zt});w.maas.push({t:zt,m:zm})}
   var iz=$('e_iz').value.trim();w.izDev=iz?Math.round(num(iz.replace('−','-'))):0;
   var ci=$('e_ci').value;w.cikis=ci||null;if(w.cikis&&w.cikis<w.giris)return toast('Ayrılış, girişten önce olamaz');
@@ -382,12 +394,13 @@ function addAdv(pre){
   var w=$('a_w').value,tl=num($('a_tl').value),t=$('a_t').value;
   if(!w)return toast('Kişiyi seçin');if(!(tl>0))return toast('Tutarı yazın');if(!t)return toast('Tarihi seçin');
   if(isClosed(ym(t)))return toast('O ay kapatıldı');
-  S.adv.push({id:uid(),w:w,tl:tl,t:t,not:$('a_n').value.trim()});touch(['core']);closeSheet();render();toast('Avans kaydedildi');
+  var na={id:uid(),w:w,tl:tl,t:t,not:$('a_n').value.trim()};S.adv.push(na);touch(['core']);render();
+  openSheet('<h3>✓ Avans kaydedildi</h3><p class="sub">'+esc(W(w).ad)+' · '+TL(tl)+' · '+tarihAd(t)+'</p>'+waBtn(W(w),advMsg(na))+'<button class="btn sec" id="a_cl">Kapat</button>');$('a_cl').onclick=closeSheet;
  };
 }
 function advSheet(aid){
  var a=S.adv.find(function(x){return x.id===aid}),w=W(a.w);
- openSheet('<h3>'+TL(a.tl)+'</h3><p class="sub">'+esc(w?w.ad:'')+' · '+tarihAd(a.t)+(a.not?' · '+esc(a.not):'')+'</p><button class="btn red" id="ad_del">Bu avansı sil</button><button class="btn sec" id="ad_no">Kapat</button>');
+ openSheet('<h3>'+TL(a.tl)+'</h3><p class="sub">'+esc(w?w.ad:'')+' · '+tarihAd(a.t)+(a.not?' · '+esc(a.not):'')+'</p>'+(w?waBtn(w,advMsg(a)):'')+'<button class="btn red" id="ad_del">Bu avansı sil</button><button class="btn sec" id="ad_no">Kapat</button>');
  $('ad_no').onclick=closeSheet;
  var armed=false;$('ad_del').onclick=function(){
   if(isClosed(ym(a.t)))return toast('O ay kapatıldı');
