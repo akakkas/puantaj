@@ -200,7 +200,7 @@ function izMsg(w){var z=izBugun(w);var L=['Sayın '+w.ad+',',tarihAd(TODAY)+' it
  L.push('*Şu an: '+izG(z.bal)+'*');return L.join('\n')}
 function cikAy(w){return w.cikis?ym(w.cikis):null}
 function acikAyrilan(k){return S.workers.filter(function(w){return w.cikis&&!w.kapandi&&cikAy(w)<k&&w.cikis>=w.giris})}
-function kapatBtn(w){return w.kapandi?'<button class="btn sec" id="kp_geri">↩ Listeye geri al</button>':'<button class="btn" id="kp_ok" style="background:#2d8a56">✓ Tüm alacağı ödendi, listeden kaldır</button>'}
+function kapatBtn(w){return w.kapandi?'<button class="btn sec" id="kp_geri">↩ Listeye geri al</button>':'<button class="btn red" id="kp_ok">İşten çıktı · Tüm alacağı ödendi, listeden kaldır</button>'}
 function bindKapat(w,after){var a=$('kp_ok'),g=$('kp_geri'),armed=false;
  if(a)a.onclick=function(){if(!armed){armed=true;this.textContent='Emin misiniz? Tekrar basın';return}w.kapandi=TODAY;touch(['core']);closeSheet();render();toast(w.ad+' listeden kaldırıldı')};
  if(g)g.onclick=function(){delete w.kapandi;touch(['core']);closeSheet();render();toast('Listeye geri alındı')}}
