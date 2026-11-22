@@ -196,6 +196,12 @@ function izBugun(w){var k=ym(TODAY),r=calc(w,k);if(!r)return{bal:izNow(w)};var d
 function izMsg(w){var z=izBugun(w);var L=['Sayın '+w.ad+',',tarihAd(TODAY)+' itibarıyla izin durumunuz:'];
  if(z.H!==undefined){if(z.izD)L.push('Önceki aylardan: '+izG(z.izD));L.push(ayAd(ym(TODAY))+' hak edilen: '+z.H+' gün, kullanılan: '+z.U+' gün')}
  L.push('*Şu an: '+izG(z.bal)+'*');return L.join('\n')}
+function cikAy(w){return w.cikis?ym(w.cikis):null}
+function acikAyrilan(k){return S.workers.filter(function(w){return w.cikis&&!w.kapandi&&cikAy(w)<k&&w.cikis>=w.giris})}
+function kapatBtn(w){return w.kapandi?'<button class="btn sec" id="kp_geri">↩ Listeye geri al</button>':'<button class="btn" id="kp_ok" style="background:#2d8a56">✓ Tüm alacağı ödendi, listeden kaldır</button>'}
+function bindKapat(w,after){var a=$('kp_ok'),g=$('kp_geri'),armed=false;
+ if(a)a.onclick=function(){if(!armed){armed=true;this.textContent='Emin misiniz? Tekrar basın';return}w.kapandi=TODAY;touch(['core']);closeSheet();render();toast(w.ad+' listeden kaldırıldı')};
+ if(g)g.onclick=function(){delete w.kapandi;touch(['core']);closeSheet();render();toast('Listeye geri alındı')}}
 function izNow(w){var k=ym(TODAY);if(w.cikis&&w.cikis<k+'-01')k=ym(w.cikis);var r=calc(w,k);return r?r.izK:(w.izDev||0)}
 
 function calc(w,k,depth){
@@ -303,13 +309,15 @@ function markSheet(wid){
 
 function vCalisan(){
  if(!S.workers.length)return '<div class="empty"><b>👷</b>İlk çalışanı eklemek için<br>sağ alttaki <b>+ Çalışan</b> butonuna basın.</div>';
- var aktif=S.workers.filter(function(w){return !w.cikis||w.cikis>=TODAY}).length;
- return '<p class="note"><b>'+aktif+'</b> aktif çalışan'+(S.workers.length>aktif?' · '+(S.workers.length-aktif)+' ayrılmış':'')+'</p>'+searchBox()+'<div id="list">'+listCalisan()+'</div>';
+ var aktif=S.workers.filter(function(w){return !w.cikis||w.cikis>=TODAY}).length,kap=S.workers.filter(function(w){return w.kapandi}).length,ayr=S.workers.length-aktif-kap;
+ return '<p class="note"><b>'+aktif+'</b> aktif çalışan'+(ayr?' · '+ayr+' ayrıldı, hesabı açık':'')+'</p>'+searchBox()+'<div id="list">'+listCalisan()+'</div>'+
+ (kap?'<button class="btn sec" id="kapTg" style="margin-top:12px">'+(showKap?'Hesabı kapananları gizle':'Hesabı kapanan '+kap+' kişiyi göster')+'</button>':'');
 }
+var showKap=false;
 function listCalisan(){
- return S.workers.filter(qf).sort(function(a,b){var ax=a.cikis&&a.cikis<TODAY,bx=b.cikis&&b.cikis<TODAY;if(ax!==bx)return ax?1:-1;return a.ad.localeCompare(b.ad,'tr')}).map(function(w){
+ return S.workers.filter(function(w){return showKap||!w.kapandi}).filter(qf).sort(function(a,b){var ax=a.cikis&&a.cikis<TODAY,bx=b.cikis&&b.cikis<TODAY;if(ax!==bx)return ax?1:-1;return a.ad.localeCompare(b.ad,'tr')}).map(function(w){
   var gone=w.cikis&&w.cikis<TODAY;
-  return '<button class="row" data-wk="'+w.id+'"'+(gone?' style="opacity:.55"':'')+'><div class="av">'+esc(ini(w.ad))+'</div><div class="nm"><b>'+esc(w.ad)+'</b><small>'+esc(w.gorev||'—')+' · Giriş '+tarihAd(w.giris)+(function(){var z=gone?0:izBugun(w).bal;return z?' · <b style="color:'+(z>0?'var(--ok,#2d8a56)':'#c63f2e')+'">izin '+izG(z)+'</b>':''})()+'</small></div>'+(gone?'<span class="chip c-X">Ayrıldı</span>':'<span class="amt">'+TL(curMaas(w)/30)+'<small style="color:var(--mut);font-weight:600">/gün</small></span>')+'</button>';
+  return '<button class="row" data-wk="'+w.id+'"'+(gone?' style="opacity:.55"':'')+'><div class="av">'+esc(ini(w.ad))+'</div><div class="nm"><b>'+esc(w.ad)+'</b><small>'+esc(w.gorev||'—')+' · Giriş '+tarihAd(w.giris)+(function(){var z=gone?0:izBugun(w).bal;return z?' · <b style="color:'+(z>0?'var(--ok,#2d8a56)':'#c63f2e')+'">izin '+izG(z)+'</b>':''})()+'</small></div>'+(gone?'<span class="chip c-X">'+(w.kapandi?'Kapandı':'Ayrıldı')+'</span>':'<span class="amt">'+TL(curMaas(w)/30)+'<small style="color:var(--mut);font-weight:600">/gün</small></span>')+'</button>';
  }).join('')||'<div class="empty">Bulunamadı.</div>';
 }
 function addWorker(){
@@ -350,7 +358,7 @@ function editWorker(wid){
  '<div class="sec-t">İzin</div><label>İşe girdiğinde içeride biriken izin (gün)</label><input id="e_iz" type="text" inputmode="numeric" value="'+(w.izDev||'')+'" placeholder="Yoksa boş bırakın">'+
  '<p class="note" style="margin-top:-6px">Uygulamaya geçmeden önceki birikmiş izni. Borçluysa başına eksi yazın (örn. -4). Bugünkü bakiye: <b>'+izG(izBugun(w).bal)+'</b></p>'+
  '<div class="sec-t">İşten ayrılış</div><label>Ayrılış tarihi (çalışıyorsa boş bırakın)</label><input id="e_ci" type="date" value="'+(w.cikis||'')+'">'+
- '<button class="btn" id="e_ok">Kaydet</button>'+waBtn(w,izMsg(w),'💬 İzin durumunu WhatsApp\'tan gönder')+'<button class="btn sec" id="e_fs">Bu ayın fişini gör</button><button class="btn red" id="e_del">Çalışanı sil</button>';
+ '<button class="btn" id="e_ok">Kaydet</button>'+(w.cikis?(function(){var r=calc(w,cikAy(w));return (r?'<p class="note" style="margin-top:10px">Son ay ('+ayAd(cikAy(w))+') net alacağı: <b>'+TL(r.net)+'</b></p>':'')+kapatBtn(w)})():'')+waBtn(w,izMsg(w),'💬 İzin durumunu WhatsApp\'tan gönder')+'<button class="btn sec" id="e_fs">Bu ayın fişini gör</button><button class="btn red" id="e_del">Çalışanı sil</button>';
  openSheet(h);
  $('e_ok').onclick=function(){
   var ad=$('e_ad').value.trim();if(!ad)return toast('Ad boş olamaz');
@@ -360,7 +368,8 @@ function editWorker(wid){
   var ci=$('e_ci').value;w.cikis=ci||null;if(w.cikis&&w.cikis<w.giris)return toast('Ayrılış, girişten önce olamaz');
   touch(['core']);closeSheet();render();toast('Kaydedildi');
  };
- $('e_fs').onclick=function(){fisSheet(wid,curMonth)};
+ $('e_fs').onclick=function(){fisSheet(wid,w.cikis&&cikAy(w)<curMonth?cikAy(w):curMonth)};
+ bindKapat(w);
  var armed=false;$('e_del').onclick=function(){
   if(!armed){armed=true;this.textContent='Emin misiniz? Tekrar basın';return}
   S.workers=S.workers.filter(function(x){return x.id!==wid});S.adv=S.adv.filter(function(a){return a.w!==wid});
@@ -412,9 +421,13 @@ function advSheet(aid){
 function vHesap(){
  var rows=S.workers.map(function(w){return{w:w,r:calc(w,curMonth)}}).filter(function(x){return x.r}).sort(function(a,b){return a.w.ad.localeCompare(b.w.ad,'tr')});
  var tot=0,ta=0,th=0;rows.forEach(function(x){th+=x.r.hak;ta+=x.r.A;tot+=Math.max(0,x.r.net)});
- var h=monthBar()+'<div class="total"><small>Ödenecek toplam (net)</small><b>'+TL(tot)+'</b><div class="sm"><span>Hak ediş '+TL(th)+'</span><span>Avans '+TL(ta)+'</span></div></div>';
+ var h=monthBar()+'<div class="total"><small>Ödenecek toplam (net) · ödeme ~20 '+AY[pd(addM(curMonth,1)+'-01').getMonth()]+'</small><b>'+TL(tot)+'</b><div class="sm"><span>Hak ediş '+TL(th)+'</span><span>Avans '+TL(ta)+'</span></div></div>';
  if(curMonth===ym(TODAY)&&!isClosed(curMonth))h+='<p class="note">⏳ Ay bitmedi: bugünden sonraki günler <b>geldi</b> sayılarak tahmin edildi.</p>';
  if(!rows.length)return h+'<div class="empty"><b>🧾</b>Bu ay için çalışan yok.</div>';
+ var ac=acikAyrilan(curMonth);
+ if(ac.length){h+='<div class="sec-t">Ayrıldı, hesabı kapanmadı</div><p class="note" style="margin-top:-4px">Bu ayın toplamına dahil değil. Ödeyince fişten “Tüm alacağı ödendi” deyin.</p>';
+  ac.forEach(function(w){var k=cikAy(w),r=calc(w,k);h+='<button class="row" data-fsk="'+w.id+'|'+k+'" style="border:1.5px dashed #d9a441"><div class="av">'+esc(ini(w.ad))+'</div><div class="nm"><b>'+esc(w.ad)+'</b><small>'+tarihAd(w.cikis)+' ayrıldı · '+ayAd(k)+' hak edişi</small></div><span class="amt'+(r&&r.net<0?' neg':'')+'">'+(r?TL(r.net):'—')+'</span></button>'});
+  h+='<div class="sec-t">'+ayAd(curMonth)+' listesi</div>';}
  h+='<button class="btn wa" id="listPdf" style="margin:0 0 12px">📄 Ay listesini PDF gönder</button>';
  h+=searchBox()+'<div id="list">'+listHesap(rows)+'</div>';
  h+=isClosed(curMonth)?'<button class="btn sec" id="unlock" style="margin-top:14px">🔓 Ayın kilidini aç</button>':'<button class="btn sec" id="lockM" style="margin-top:14px">🔒 Ödemeler yapıldı, ayı kapat</button>';
@@ -473,8 +486,9 @@ function fisSheet(wid,k){
  var txt=fisText(w,k,r);
  h+='<button class="btn wa" id="fs_pdf">📄 PDF olarak gönder</button><a class="btn sec" href="https://wa.me/?text='+encodeURIComponent(txt)+'" target="_blank" rel="noopener">Yazı olarak WhatsApp\'a gönder</a><button class="btn sec" id="fs_cp">Fişi kopyala</button>';
  if(!isClosed(k))h+='<button class="btn sec" id="fs_av">+ Bu kişiye avans</button>';
+ if(w.cikis&&cikAy(w)===k)h+=kapatBtn(w);
  h+='<button class="btn sec" id="fs_no">Kapat</button>';
- openSheet(h);
+ openSheet(h);bindKapat(w);
  $('fs_cp').onclick=function(){copyText(txt)};
  $('fs_pdf').onclick=function(){shareFile(fisPdf(w,k,r),pdfName(w.ad+' '+ayAd(k)))};
  $('fs_no').onclick=closeSheet;
@@ -522,6 +536,8 @@ function bind(){
  m.querySelectorAll('[data-wk]').forEach(function(b){b.onclick=function(){editWorker(b.dataset.wk)}});
  m.querySelectorAll('[data-av]').forEach(function(b){b.onclick=function(){advSheet(b.dataset.av)}});
  m.querySelectorAll('[data-fs]').forEach(function(b){b.onclick=function(){fisSheet(b.dataset.fs,curMonth)}});
+ m.querySelectorAll('[data-fsk]').forEach(function(b){b.onclick=function(){var x=b.dataset.fsk.split('|');fisSheet(x[0],x[1])}});
+ var kt=$('kapTg');if(kt)kt.onclick=function(){showKap=!showKap;render()};
  var qi=$('q');if(qi)qi.oninput=function(){q=this.value;var l=$('list');l.innerHTML=tab==='bugun'?listBugun():tab==='calisan'?listCalisan():listHesap();bindList()};
  var lk=$('lockM');if(lk){var armed=false;lk.onclick=function(){if(!armed){armed=true;this.textContent='Kapatılsın mı? Tekrar basın';return}S.izOde[curMonth]=S.izOde[curMonth]||{};S.workers.forEach(function(w){var r=calc(w,curMonth);if(r&&!r.ovr)S.izOde[curMonth][w.id]=r.ode});S.closed.push(curMonth);touch(['core']);render();toast(ayAd(curMonth)+' kapatıldı')}}
  var lp=$('listPdf');if(lp)lp.onclick=function(){shareFile(listPdf(curMonth),pdfName('Puantaj '+ayAd(curMonth)))};
