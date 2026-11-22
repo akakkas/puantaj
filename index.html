@@ -179,7 +179,7 @@ function mark(d,wid){var m=S.marks[d];return(m&&m[wid])||{d:'T',m:0}}
 function setMark(d,wid,o){
  if(isClosed(ym(d))){toast('Bu ay kapatıldı. Önce kilidi açın.');return false}
  S.marks[d]=S.marks[d]||{};
- if(o.d==='T'&&!o.m&&!o.h)delete S.marks[d][wid];else{var x={d:o.d,m:o.m||0};if(o.h)x.h=o.h;S.marks[d][wid]=x}
+ if(o.d==='T'&&!o.m&&!o.h)delete S.marks[d][wid];else{var x={d:o.d,m:o.m||0};if(o.h)x.h=o.h;var nw=new Date();x.at=ds(nw)+' '+p2(nw.getHours())+':'+p2(nw.getMinutes());S.marks[d][wid]=x}
  if(!Object.keys(S.marks[d]).length)delete S.marks[d];
  touch(['m-'+ym(d)]);return true;
 }
@@ -233,6 +233,93 @@ function calc(w,k,depth){
  var res={D:D,g:g,c:c,Gn:Gn,Yn:Yn,U:U,M:M,H:H,izD:izD,izB:izB,ode:ode,odeK:odeK,izK:izK,ovr:typeof ov==='number',base:base,gK:gK,yK:yK,mes:mes,Sa:Sa,saK:saK,hak:hak,A:A,dev:dev,net:hak-A+dev,gun:gun,rE:rE};
  cache[ck]=res;return res;
 }
+
+/* ---------- raporlar ---------- */
+function gAd(d,kisa){var x=pd(d);return x.getDate()+' '+(kisa?AY[x.getMonth()].slice(0,3):AY[x.getMonth()])+' '+(kisa?GUN[x.getDay()].slice(0,3):GUN[x.getDay()])}
+function gunler(w,k){var L=lastDay(k),o={I:[],G:[],Y:[],H:[]};
+ for(var i=1;i<=L;i++){var d=k+'-'+p2(i),m=S.marks[d]&&S.marks[d][w.id];if(!m||!active(w,d))continue;
+  if(o[m.d])o[m.d].push({d:d,at:m.at});if(m.h)o.H.push({d:d,h:m.h,tl:m.h*saatU(d),at:m.at})}
+ return o}
+function sumH(a){return a.reduce(function(t,x){return t+x.h},0)}
+function dokumText(w,k){var g=gunler(w,k),L=['Sayın '+w.ad+',',ayAd(k)+' puantaj kayıtlarınız:'];
+ var ln=function(t,a){if(a.length)L.push('','*'+t+' ('+a.length+' gün):*',a.map(function(x){return '• '+gAd(x.d)}).join('\n'))};
+ ln('İzinli',g.I);ln('Gelmedi',g.G);ln('Yarım gün',g.Y);
+ if(g.H.length)L.push('','*Fazla mesai ('+G1(sumH(g.H))+' saat):*',g.H.map(function(x){return '• '+gAd(x.d)+': '+G1(x.h)+' saat'}).join('\n'));
+ if(L.length===2)L.push('İzin, devamsızlık veya mesai kaydı yok.');
+ return L.join('\n')}
+function dokumSheet(wid,k){var w=W(wid),g=gunler(w,k);
+ var blk=function(t,a,cls,f){if(!a.length)return '';return '<div class="sec-t">'+t+' · '+a.length+' gün</div><table class="fis">'+a.map(function(x){return '<tr><td>'+gAd(x.d)+(x.at?'<small>İşaretlendi: '+gAd(x.at.slice(0,10),1)+' '+x.at.slice(11)+'</small>':'')+'</td><td class="'+(cls||'')+'">'+(f?f(x):'')+'</td></tr>'}).join('')+'</table>'};
+ var h='<h3>'+esc(w.ad)+'</h3><p class="sub">'+ayAd(k)+' · gün gün döküm</p>';
+ var b=blk('İzinli',g.I)+blk('Gelmedi',g.G)+blk('Yarım gün',g.Y)+blk('Fazla mesai',g.H,'pos',function(x){return G1(x.h)+' sa · '+TL(x.tl)});
+ h+=b||'<div class="empty">Bu ay izin, devamsızlık veya mesai kaydı yok.</div>';
+ h+=waBtn(w,dokumText(w,k),'💬 Dökümü WhatsApp\'tan gönder')+'<button class="btn sec" id="dk_pdf">📄 PDF</button><button class="btn sec" id="dk_no">Kapat</button>';
+ openSheet(h);$('dk_no').onclick=closeSheet;$('dk_pdf').onclick=function(){shareFile(dokumPdf(w,k),pdfName(w.ad+' '+ayAd(k)+' döküm'))}}
+function dokumPdf(w,k){var g=gunler(w,k),R=[];
+ var add=function(t,a,f){if(!a.length)return;R.push({t:t+' · '+a.length+' gün'});a.forEach(function(x){R.push({l:gAd(x.d),s:x.at?'İşaretlendi: '+gAd(x.at.slice(0,10),1)+' '+x.at.slice(11):'',v:f?f(x):''})})};
+ add('İZİNLİ',g.I);add('GELMEDİ',g.G);add('YARIM GÜN',g.Y);add('FAZLA MESAİ',g.H,function(x){return G1(x.h)+' sa  '+TL(x.tl)});
+ var hh=260+R.length*92+120,P=paper(hh),x=P.x;head(x,w.ad,ayAd(k)+'  ·  gün gün döküm');var y=250;
+ if(!R.length){x.font='600 34px '+FONT;x.fillStyle='#6c7077';x.fillText('Kayıt yok.',70,y)}
+ R.forEach(function(q){if(q.t){x.font='800 28px '+FONT;x.fillStyle='#e8781a';x.textAlign='left';x.fillText(q.t,70,y+10);y+=70}else{rowT(x,y,q.l,q.s,q.v);y+=92}});
+ x.textAlign='left';x.font='500 26px '+FONT;x.fillStyle='#6c7077';x.fillText('Düzenlenme: '+tarihAd(TODAY),70,hh-50);return jpegPdf(P.c)}
+function raporRows(k){return S.workers.map(function(w){var r=calc(w,k);return r?{w:w,r:r,g:gunler(w,k)}:null}).filter(Boolean).sort(function(a,b){return a.w.ad.localeCompare(b.w.ad,'tr')})}
+function raporSheet(k){
+ openSheet('<h3>Raporlar</h3><p class="sub">'+ayAd(k)+'</p>'+
+ '<button class="btn" id="rp_cz">📅 Aylık çizelge (PDF)</button><p class="note">Herkesin her günü tek sayfada: geldi, gelmedi, yarım, izin, mesai saati.</p>'+
+ '<button class="btn sec" id="rp_ms">⏱ Fazla mesai: kim ne kadar</button><button class="btn sec" id="rp_iz">🏖 İzin ve devamsızlık: kim ne kadar</button>'+
+ '<p class="note">Kişiye dokununca gün gün dökümü açılır, WhatsApp\'tan kendisine gönderebilirsiniz.</p><button class="btn sec" id="rp_no">Kapat</button>');
+ $('rp_no').onclick=closeSheet;$('rp_cz').onclick=function(){shareFile(cizelgePdf(k),pdfName('Çizelge '+ayAd(k)))};
+ $('rp_ms').onclick=function(){topluSheet(k,'ms')};$('rp_iz').onclick=function(){topluSheet(k,'iz')}}
+function topluSheet(k,tp){var rows=raporRows(k),h;
+ if(tp==='ms'){rows=rows.filter(function(o){return o.g.H.length||o.r.M});var th=0,tt=0;
+  h='<h3>Fazla mesai</h3><p class="sub">'+ayAd(k)+'</p><table class="fis"><tr><td><b>Ad</b></td><td><b>Saat · Tutar</b></td></tr>'+rows.map(function(o){th+=o.r.Sa;tt+=o.r.saK+o.r.mes;
+   return '<tr data-dk="'+o.w.id+'" style="cursor:pointer"><td>'+esc(o.w.ad)+'<small>'+o.g.H.length+' gün mesai'+(o.r.M?' · eski kayıt '+G1(o.r.M)+' gün':'')+'</small></td><td class="pos">'+G1(o.r.Sa)+' sa · '+TL(o.r.saK+o.r.mes)+'</td></tr>'}).join('')+
+   '<tr class="net"><td>TOPLAM</td><td>'+G1(th)+' sa · '+TL(tt)+'</td></tr></table>';
+  if(!rows.length)h='<h3>Fazla mesai</h3><p class="sub">'+ayAd(k)+'</p><div class="empty">Bu ay mesai yok.</div>';
+ }else{var ti=0,tg=0;
+  h='<h3>İzin ve devamsızlık</h3><p class="sub">'+ayAd(k)+'</p><table class="fis"><tr><td><b>Ad</b></td><td><b>İzin · Gelmedi · Yarım</b></td></tr>'+rows.map(function(o){ti+=o.g.I.length;tg+=o.g.G.length;
+   return '<tr data-dk="'+o.w.id+'" style="cursor:pointer"><td>'+esc(o.w.ad)+'<small>Hak '+o.r.H+' · bakiye '+izG(o.r.izB)+'</small></td><td>'+o.g.I.length+' · <span class="'+(o.g.G.length?'neg':'')+'">'+o.g.G.length+'</span> · '+o.g.Y.length+'</td></tr>'}).join('')+
+   '<tr class="net"><td>TOPLAM</td><td>'+ti+' · '+tg+'</td></tr></table>';}
+ h+='<button class="btn wa" id="tp_pdf">📄 PDF olarak gönder</button><button class="btn sec" id="tp_bk">‹ Raporlar</button>';
+ openSheet(h);$('tp_bk').onclick=function(){raporSheet(k)};$('tp_pdf').onclick=function(){shareFile(topluPdf(k,tp),pdfName((tp==='ms'?'Mesai ':'Izin ')+ayAd(k)))};
+ $('sheet').querySelectorAll('[data-dk]').forEach(function(t){t.onclick=function(){dokumSheet(t.dataset.dk,k)}})}
+function topluPdf(k,tp){var rows=raporRows(k);if(tp==='ms')rows=rows.filter(function(o){return o.g.H.length||o.r.M});
+ var hh=300+rows.length*66+200,P=paper(hh),x=P.x,cols=tp==='ms'?[70,700,900,1170]:[70,700,850,1000,1170];
+ head(x,tp==='ms'?'Fazla mesai raporu':'İzin ve devamsızlık',ayAd(k)+'  ·  '+rows.length+' kişi');
+ var hd=tp==='ms'?[['AD SOYAD',0,'l'],['GÜN',1,'r'],['SAAT',2,'r'],['TUTAR',3,'r']]:[['AD SOYAD',0,'l'],['İZİN',1,'r'],['GELMEDİ',2,'r'],['YARIM',3,'r'],['BAKİYE',4,'r']];
+ var y=240;x.font='800 26px '+FONT;x.fillStyle='#6c7077';hd.forEach(function(c){x.textAlign=c[2]==='l'?'left':'right';x.fillText(c[0],cols[c[1]],y)});y+=50;
+ var T=[0,0,0,0];
+ rows.forEach(function(o,i){if(i%2===0){x.fillStyle='#f6f3ee';x.fillRect(50,y-30,1140,62)}
+  x.font='600 30px '+FONT;x.fillStyle='#1e2226';x.textAlign='left';x.fillText(o.w.ad.length>30?o.w.ad.slice(0,29)+'…':o.w.ad,cols[0],y);x.textAlign='right';
+  var v=tp==='ms'?[o.g.H.length,G1(o.r.Sa),TL(o.r.saK+o.r.mes)]:[o.g.I.length,o.g.G.length,o.g.Y.length,izG(o.r.izB)];
+  if(tp==='ms'){T[0]+=o.r.Sa;T[1]+=o.r.saK+o.r.mes}else{T[0]+=o.g.I.length;T[1]+=o.g.G.length;T[2]+=o.g.Y.length}
+  v.forEach(function(t,j){x.fillText(String(t),cols[j+1],y)});y+=66});
+ x.fillStyle='#1e2226';x.fillRect(50,y,1140,100);x.fillStyle='#fff';x.font='800 32px '+FONT;x.textAlign='left';x.fillText('TOPLAM',cols[0],y+50);x.textAlign='right';
+ if(tp==='ms'){x.fillText(G1(T[0]),cols[2],y+50);x.fillStyle='#ffb067';x.fillText(TL(T[1]),cols[3],y+50)}else{x.fillText(T[0],cols[1],y+50);x.fillText(T[1],cols[2],y+50);x.fillText(T[2],cols[3],y+50)}
+ x.textAlign='left';x.font='500 26px '+FONT;x.fillStyle='#6c7077';x.fillText('Düzenlenme: '+tarihAd(TODAY),70,hh-50);return jpegPdf(P.c)}
+function cizelgePdf(k){var rows=raporRows(k),L=lastDay(k),Wc=2480,nw=380,sm=[['GÜN',110],['İZİN',90],['GLM',90],['MESAİ',110]],smw=400,cw=(Wc-80-nw-smw)/L,rh=58,top=300;
+ var hh=top+rows.length*rh+190,c=document.createElement('canvas');c.width=Wc;c.height=hh;var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,Wc,hh);x.textBaseline='middle';
+ x.fillStyle='#1e2226';x.fillRect(0,0,Wc,150);x.fillStyle='#e8781a';x.fillRect(0,150,Wc,8);x.fillStyle='#fff';x.font='800 56px '+FONT;x.fillText('Aylık puantaj çizelgesi · '+ayAd(k),40,75);
+ x.fillStyle='#c9ccd1';x.font='600 30px '+FONT;x.textAlign='right';x.fillText('✓ geldi   ✗ gelmedi   ½ yarım   İ izinli   küçük sayı: mesai saati',Wc-40,75);
+ var x0=40+nw,y=top-50;x.font='800 26px '+FONT;
+ for(var i=1;i<=L;i++){var dd=pd(k+'-'+p2(i)),cx=x0+(i-0.5)*cw;if(dd.getDay()===0){x.fillStyle='#f3efe7';x.fillRect(x0+(i-1)*cw,y-40,cw,rows.length*rh+70)}
+  x.fillStyle='#1e2226';x.textAlign='center';x.fillText(i,cx,y-12);x.font='600 18px '+FONT;x.fillStyle='#8a8d93';x.fillText(GUN[dd.getDay()].slice(0,2),cx,y+14);x.font='800 26px '+FONT}
+ var sx=Wc-40-smw;x.fillStyle='#6c7077';sm.forEach(function(q){x.textAlign='center';x.fillText(q[0],sx+q[1]/2,y);sx+=q[1]});
+ y=top;
+ rows.forEach(function(o,ri){var w=o.w;if(ri%2===0){x.fillStyle='rgba(30,34,38,.035)';x.fillRect(30,y-rh/2,Wc-60,rh)}
+  x.font='700 28px '+FONT;x.fillStyle='#1e2226';x.textAlign='left';x.fillText(w.ad.length>22?w.ad.slice(0,21)+'…':w.ad,40,y);
+  for(var i=1;i<=L;i++){var d=k+'-'+p2(i),cx=x0+(i-0.5)*cw;x.textAlign='center';
+   if(!active(w,d)){x.fillStyle='#d9d4ca';x.font='600 22px '+FONT;x.fillText('–',cx,y);continue}
+   var m=S.marks[d]&&S.marks[d][w.id],st=m?m.d:'T';
+   if(d>TODAY&&!m){continue}
+   var cl={T:['✓','#2d8a56',null],G:['✗','#c63f2e','#fbe1dc'],Y:['½','#b7791f','#fdf0d5'],I:['İ','#2f5fb3','#dfe8f8']}[st];
+   if(cl[2]){x.fillStyle=cl[2];x.fillRect(x0+(i-1)*cw+2,y-rh/2+3,cw-4,rh-6)}
+   x.fillStyle=cl[1];x.font='800 28px '+FONT;x.fillText(cl[0],cx,y+2);
+   if(m&&(m.h||m.m)){x.fillStyle='#e8781a';x.font='800 18px '+FONT;x.textAlign='right';x.fillText(m.h?G1(m.h):(m.m===1?'1g':'½g'),x0+i*cw-3,y-rh/2+13)}}
+  var sx=Wc-40-smw,v=[G1(o.r.gun),o.g.I.length,o.g.G.length,o.r.Sa?G1(o.r.Sa):'—'];x.font='800 28px '+FONT;x.fillStyle='#1e2226';
+  sm.forEach(function(q,j){x.textAlign='center';x.fillText(String(v[j]),sx+q[1]/2,y);sx+=q[1]});
+  x.strokeStyle='#e7e1d6';x.lineWidth=1;x.beginPath();x.moveTo(30,y+rh/2);x.lineTo(Wc-30,y+rh/2);x.stroke();y+=rh});
+ x.textAlign='left';x.font='500 26px '+FONT;x.fillStyle='#6c7077';x.fillText('Düzenlenme: '+tarihAd(TODAY)+(k===ym(TODAY)?'  ·  Ay devam ediyor':'' ),40,hh-50);
+ return jpegPdf(c)}
 
 /* ---------- ui helpers ---------- */
 var tt;function toast(t){var e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(tt);tt=setTimeout(function(){e.classList.remove('on')},2200)}
@@ -439,7 +526,7 @@ function vHesap(){
  if(ac.length){h+='<div class="sec-t">Ayrıldı, hesabı kapanmadı</div><p class="note" style="margin-top:-4px">Bu ayın toplamına dahil değil. Ödeyince fişten “Tüm alacağı ödendi” deyin.</p>';
   ac.forEach(function(w){var k=cikAy(w),r=calc(w,k);h+='<button class="row" data-fsk="'+w.id+'|'+k+'" style="border:1.5px dashed #d9a441"><div class="av">'+esc(ini(w.ad))+'</div><div class="nm"><b>'+esc(w.ad)+'</b><small>'+tarihAd(w.cikis)+' ayrıldı · '+ayAd(k)+' hak edişi</small></div><span class="amt'+(r&&r.net<0?' neg':'')+'">'+(r?TL(r.net):'—')+'</span></button>'});
   h+='<div class="sec-t">'+ayAd(curMonth)+' listesi</div>';}
- h+='<button class="btn wa" id="listPdf" style="margin:0 0 12px">📄 Ay listesini PDF gönder</button>';
+ h+='<button class="btn wa" id="listPdf" style="margin:0 0 8px">📄 Ay listesini PDF gönder</button><button class="btn sec" id="rapor" style="margin:0 0 12px">📊 Çizelge, mesai ve izin raporları</button>';
  h+=searchBox()+'<div id="list">'+listHesap(rows)+'</div>';
  h+=isClosed(curMonth)?'<button class="btn sec" id="unlock" style="margin-top:14px">🔓 Ayın kilidini aç</button>':'<button class="btn sec" id="lockM" style="margin-top:14px">🔒 Ödemeler yapıldı, ayı kapat</button>';
  return h;
@@ -497,12 +584,13 @@ function fisSheet(wid,k){
   (cl?'':'<div class="izq"><button id="iz_all">'+(r.izB>0?'Hepsini öde':'Hepsini kes')+'</button><button id="iz_none">Hepsini biriktir</button></div>')+'</div>';
  }
  var txt=fisText(w,k,r);
- h+='<button class="btn wa" id="fs_pdf">📄 PDF olarak gönder</button><a class="btn sec" href="https://wa.me/?text='+encodeURIComponent(txt)+'" target="_blank" rel="noopener">Yazı olarak WhatsApp\'a gönder</a><button class="btn sec" id="fs_cp">Fişi kopyala</button>';
+ h+='<button class="btn sec" id="fs_dk">📋 Gün gün döküm (izin, gelmedi, mesai)</button><button class="btn wa" id="fs_pdf">📄 PDF olarak gönder</button><a class="btn sec" href="https://wa.me/?text='+encodeURIComponent(txt)+'" target="_blank" rel="noopener">Yazı olarak WhatsApp\'a gönder</a><button class="btn sec" id="fs_cp">Fişi kopyala</button>';
  if(!isClosed(k))h+='<button class="btn sec" id="fs_av">+ Bu kişiye avans</button>';
  if(w.cikis&&cikAy(w)===k)h+=kapatBtn(w);
  h+='<button class="btn sec" id="fs_no">Kapat</button>';
  openSheet(h);bindKapat(w);
  $('fs_cp').onclick=function(){copyText(txt)};
+ $('fs_dk').onclick=function(){dokumSheet(wid,k)};
  $('fs_pdf').onclick=function(){shareFile(fisPdf(w,k,r),pdfName(w.ad+' '+ayAd(k)))};
  $('fs_no').onclick=closeSheet;
  var fa=$('fs_av');if(fa)fa.onclick=function(){var cm=curMonth;curMonth=k;addAdv(wid);curMonth=cm};
@@ -559,6 +647,7 @@ function bind(){
  var kt=$('kapTg');if(kt)kt.onclick=function(){showKap=!showKap;render()};
  var qi=$('q');if(qi)qi.oninput=function(){q=this.value;var l=$('list');l.innerHTML=tab==='bugun'?listBugun():tab==='calisan'?listCalisan():listHesap();bindList()};
  var lk=$('lockM');if(lk){var armed=false;lk.onclick=function(){if(!armed){armed=true;this.textContent='Kapatılsın mı? Tekrar basın';return}S.izOde[curMonth]=S.izOde[curMonth]||{};S.workers.forEach(function(w){var r=calc(w,curMonth);if(r&&!r.ovr)S.izOde[curMonth][w.id]=r.ode});S.closed.push(curMonth);touch(['core']);render();toast(ayAd(curMonth)+' kapatıldı')}}
+ var rp=$('rapor');if(rp)rp.onclick=function(){raporSheet(curMonth)};
  var lp=$('listPdf');if(lp)lp.onclick=function(){shareFile(listPdf(curMonth),pdfName('Puantaj '+ayAd(curMonth)))};
  var ul=$('unlock');if(ul)ul.onclick=function(){S.closed=S.closed.filter(function(x){return x!==curMonth});touch(['core']);render();toast('Kilit açıldı')};
 }
@@ -588,7 +677,7 @@ function seed(){
 /* ---------- pdf ---------- */
 function pdfName(t){return t.replace(/[^\wçğıöşüÇĞİÖŞÜ ]+/g,'').trim().replace(/\s+/g,'-')+'.pdf'}
 function jpegPdf(canvas){
- var W=595.28,H=W*canvas.height/canvas.width;
+ var W=canvas.width>canvas.height?841.89:595.28,H=W*canvas.height/canvas.width;
  var b64=canvas.toDataURL('image/jpeg',0.9).split(',')[1],bin=atob(b64),img=new Uint8Array(bin.length);
  for(var i=0;i<bin.length;i++)img[i]=bin.charCodeAt(i);
  var enc=new TextEncoder(),parts=[],off=0,xr=[];
